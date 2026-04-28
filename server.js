@@ -516,16 +516,24 @@ app.get("/api/audit/:id", (req, res) => {
 
 // ── Upload cleanup (auto-delete old files) ──────────────────────
 function cleanupUploads() {
-  const cutoff = Date.now() - UPLOAD_TTL * 60 * 1000;
-  if (!fs.existsSync(UPLOAD_DIR)) return;
-  fs.readdirSync(UPLOAD_DIR).forEach((file) => {
-    const filePath = path.join(UPLOAD_DIR, file);
-    const stat = fs.statSync(filePath);
-    if (stat.mtimeMs < cutoff) {
-      fs.unlinkSync(filePath);
-      console.log(`🗑️  Cleaned up: ${file}`);
-    }
-  });
+  try {
+    const cutoff = Date.now() - UPLOAD_TTL * 60 * 1000;
+    if (!fs.existsSync(UPLOAD_DIR)) return;
+    fs.readdirSync(UPLOAD_DIR).forEach((file) => {
+      try {
+        const filePath = path.join(UPLOAD_DIR, file);
+        const stat = fs.statSync(filePath);
+        if (stat.mtimeMs < cutoff) {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️  Cleaned up: ${file}`);
+        }
+      } catch (err) {
+        console.error(`Failed to clean up file ${file}:`, err.message);
+      }
+    });
+  } catch (err) {
+    console.error("Cleanup interval error:", err.message);
+  }
 }
 setInterval(cleanupUploads, 10 * 60 * 1000); // Every 10 minutes
 
@@ -542,6 +550,14 @@ app.use((err, req, res, next) => {
   }
   console.error("Server error:", err);
   res.status(500).json({ error: "Internal server error." });
+});
+
+// ══════ SAFETY NET ═════════════════════════════════════════════════
+process.on('uncaughtException', (err) => {
+  console.error('CRITICAL: Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // ══════ START SERVER ═════════════════════════════════════════════
