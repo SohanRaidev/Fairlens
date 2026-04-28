@@ -22,6 +22,7 @@ const fs = require("fs");
 const { execFile } = require("child_process");
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 const MAX_UPLOAD_MB = parseInt(process.env.MAX_UPLOAD_MB || "10", 10);
 const UPLOAD_TTL = parseInt(process.env.UPLOAD_TTL_MINUTES || "60", 10);
