@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairLens — AI Fairness Auditor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,800&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════ CSS CUSTOM PROPERTIES ══════════════════════════════════ */
+:root {
+  --bg: #f6f2ea;
+  --bg-card: #fffdf8;
+  --ink: #181a1c;
+  --ink-soft: #4a4d52;
+  --ink-mute: #8a8780;
+  --line: #e2dccf;
+  --line-soft: #ece6d8;
+  --accent: #c1352a;
+  --accent-soft: #f4e3df;
+  --good: #38614a;
+  --good-soft: #dde7df;
+  --warn: #c47b1a;
+  --warn-soft: #f1e4cb;
+  --hl: #f0c93f;
+  --radius: 16px;
+  --shadow: 0 1px 0 rgba(24,26,28,0.04), 0 8px 24px -12px rgba(24,26,28,0.10);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ══════ RESET & BASE ═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.28;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.container { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+
+/* ══════ TYPOGRAPHY ══════════════════════════════════════════════ */
+h1, h2, h3, h4 { font-family: var(--font-display); }
+.hero-title { font-size: clamp(40px,5vw,62px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.hero-title em { font-style: italic; color: var(--accent); }
+.section-title { font-family: var(--font-display); font-size: 22px; font-weight: 600; margin-bottom: 20px; }
+.label-caps { font-family: var(--font-body); font-weight: 700; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); }
+.metric-value { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1; }
+.verdict-number-text { font-family: var(--font-display); font-size: 64px; font-weight: 600; line-height: 1; }
+code, .mono { font-family: var(--font-mono); font-size: 12px; }
+
+/* ══════ CARD ════════════════════════════════════════════════════ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 26px;
+}
+
+/* ══════ HEADER ══════════════════════════════════════════════════ */
+#header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(246,242,234,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.header-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.brand-name { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: var(--ink); letter-spacing: -0.01em; }
+.logo-svg { color: var(--ink); flex-shrink: 0; }
+.header-key { display: flex; align-items: center; gap: 10px; }
+.key-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); }
+.key-wrap { display: flex; align-items: center; gap: 8px; }
+#api-key-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--ink);
+  width: 220px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#api-key-input:focus { border-color: var(--ink-soft); }
+#api-key-input::placeholder { color: var(--ink-mute); }
+.status-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--ink-mute);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.status-dot.live { background: var(--good); box-shadow: 0 0 0 3px rgba(56,97,74,0.2); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(56,97,74,0.2); } 50% { box-shadow: 0 0 0 6px rgba(56,97,74,0); } }
+
+/* ══════ HERO ════════════════════════════════════════════════════ */
+#hero { padding: 80px 0 64px; }
+.hero-sub { max-width: 680px; color: var(--ink-soft); margin: 20px 0 48px; font-size: 17px; line-height: 1.65; }
+.hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.stat-item { border-left: 3px solid var(--accent); padding-left: 20px; }
+.stat-number { display: block; font-family: var(--font-display); font-size: 42px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1; }
+.stat-label { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 6px; line-height: 1.45; }
+
+/* ══════ TABS ════════════════════════════════════════════════════ */
+#tabs-section { padding: 0 0 40px; }
+.tab-strip {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 2px;
+}
+.tab-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 24px;
+  border: none; border-radius: 9px;
+  font-family: var(--font-body); font-weight: 600; font-size: 14px;
+  cursor: pointer;
+  background: transparent; color: var(--ink-mute);
+  transition: background 0.2s, color 0.2s;
+}
+.tab-btn svg { width: 16px; height: 16px; }
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { background: var(--ink); color: #fff; }
+
+/* ══════ VERDICT BANNER ══════════════════════════════════════════ */
+#verdict-section { padding-bottom: 32px; }
+.verdict-banner {
+  border-radius: var(--radius);
+  padding: 32px 40px;
+  display: flex; align-items: center; gap: 32px;
+  transition: background 0.4s, border-color 0.4s;
+  border: 1px solid transparent;
+}
+.verdict-bias { background: var(--accent-soft); border-color: rgba(193,53,42,0.2); }
+.verdict-borderline { background: var(--warn-soft); border-color: rgba(196,123,26,0.2); }
+.verdict-fair { background: var(--good-soft); border-color: rgba(56,97,74,0.2); }
+.verdict-icon { font-size: 40px; flex-shrink: 0; }
+.verdict-main { flex-shrink: 0; }
+.verdict-di { font-family: var(--font-display); font-size: 64px; font-weight: 600; line-height: 1; }
+.verdict-bias .verdict-di { color: var(--accent); }
+.verdict-borderline .verdict-di { color: var(--warn); }
+.verdict-fair .verdict-di { color: var(--good); }
+.verdict-sublabel { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); margin-top: 4px; }
+.verdict-label { font-family: var(--font-display); font-size: 26px; font-weight: 600; }
+.verdict-bias .verdict-label { color: var(--accent); }
+.verdict-borderline .verdict-label { color: var(--warn); }
+.verdict-fair .verdict-label { color: var(--good); }
+
+/* ══════ AUDIT GRID ══════════════════════════════════════════════ */
+#audit-section { padding-bottom: 48px; }
+.audit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.audit-chart-card { display: flex; flex-direction: column; gap: 20px; }
+.chart-bars { display: flex; flex-direction: column; gap: 16px; }
+.bar-row { display: flex; flex-direction: column; gap: 6px; }
+.bar-meta { display: flex; justify-content: space-between; align-items: baseline; }
+.bar-group-name { font-weight: 600; font-size: 14px; }
+.bar-pct { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+.bar-track { height: 32px; background: var(--line-soft); border-radius: 6px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  width: 0;
+  transition: width 1s cubic-bezier(0.16,1,0.3,1);
+  display: flex; align-items: center; padding-left: 12px;
+}
+.bar-fill-priv { background: var(--ink); }
+.bar-fill-unpriv { background: var(--accent); }
+.bar-n { font-family: var(--font-mono); font-size: 10px; color: var(--ink-mute); }
+
+.callout-box {
+  background: rgba(240,201,63,0.15);
+  border-left: 3px solid var(--hl);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.metric-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-content: start; }
+.metric-card {
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  padding: 20px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  animation: fadeUp 0.4s both;
+  position: relative;
+}
+.metric-card.status-bias { background: var(--accent-soft); border-color: rgba(193,53,42,0.25); }
+.metric-card.status-borderline { background: var(--warn-soft); border-color: rgba(196,123,26,0.25); }
+.metric-card.status-fair { background: var(--good-soft); border-color: rgba(56,97,74,0.25); }
+
+.metric-name-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.metric-name { font-family: var(--font-mono); font-weight: 700; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.metric-tooltip {
+  position: relative; cursor: help;
+  font-size: 12px; color: var(--ink-mute);
+  border-bottom: 1px dashed var(--ink-mute);
+}
+.metric-tooltip::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff;
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 11px; line-height: 1.5; white-space: normal; width: 240px;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  font-family: var(--font-body); font-weight: 400; letter-spacing: 0; text-transform: none;
+  z-index: 10;
+}
+.metric-tooltip:hover::after { opacity: 1; }
+.metric-val { font-family: var(--font-display); font-size: 34px; font-weight: 600; line-height: 1; margin-bottom: 8px; }
+.status-bias .metric-val { color: var(--accent); }
+.status-borderline .metric-val { color: var(--warn); }
+.status-fair .metric-val { color: var(--good); }
+.status-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 20px; margin-bottom: 8px;
+}
+.status-bias .status-badge { background: rgba(193,53,42,0.12); color: var(--accent); }
+.status-borderline .status-badge { background: rgba(196,123,26,0.12); color: var(--warn); }
+.status-fair .status-badge { background: rgba(56,97,74,0.12); color: var(--good); }
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.metric-explain { font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+
+/* ══════ DATA PREVIEW ════════════════════════════════════════════ */
+#preview-section { padding-bottom: 48px; }
+.preview-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.badge {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  background: var(--line-soft); color: var(--ink-mute);
+  padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line);
+}
+.table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; background: var(--bg-card); }
+thead { border-bottom: 1px solid var(--line); }
+th {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--ink-mute); padding: 12px 16px; text-align: left;
+  background: var(--bg);
+}
+td { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--line-soft); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--line-soft); }
+.cell-yes { color: var(--good); font-weight: 700; }
+.cell-no { color: var(--accent); font-weight: 700; }
+.cell-priv { color: var(--ink-soft); font-size: 12px; }
+.cell-unpriv { color: var(--accent); font-size: 12px; }
+
+/* ══════ GEMINI PANEL ════════════════════════════════════════════ */
+#gemini-section { padding-bottom: 48px; }
+.gemini-panel {
+  background: #1c1c20;
+  border-radius: 20px;
+  padding: 48px;
+  color: #f0ead8;
+}
+.gemini-header { display: flex; flex-direction: column; gap: 8px; margin-bottom: 32px; }
+.gemini-title { font-family: var(--font-display); font-size: 28px; font-weight: 600; color: #f0ead8; }
+.gemini-subtitle { font-size: 13px; color: #8a8780; }
+.gemini-mode { font-family: var(--font-mono); font-size: 11px; color: var(--hl); letter-spacing: 0.1em; text-transform: uppercase; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--hl); color: var(--ink);
+  border: none; border-radius: 10px;
+  padding: 12px 24px; font-family: var(--font-body); font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: opacity 0.2s, transform 0.15s;
+  margin-top: 8px; align-self: flex-start;
+}
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.5; cursor: wait; }
+.gemini-output { min-height: 40px; }
+.gemini-output.loading::after { content: '⏳ Generating analysis…'; font-family: var(--font-mono); font-size: 13px; color: #8a8780; }
+.gem-section { margin-bottom: 28px; }
+.gem-h { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--hl); margin-bottom: 10px; }
+.gem-body { font-size: 15px; line-height: 1.7; color: #d8d2c4; }
+.gem-body ul, .gem-body ol { padding-left: 20px; }
+.gem-body li { margin-bottom: 6px; }
+.gem-body strong { color: #f0ead8; font-weight: 600; }
+
+/* ══════ MITIGATION ══════════════════════════════════════════════ */
+#mitigation-section { padding-bottom: 48px; }
+.mit-intro { color: var(--ink-soft); margin-bottom: 24px; }
+.slider-wrap { margin-bottom: 32px; }
+.slider-label { font-weight: 600; font-size: 15px; margin-bottom: 10px; display: block; }
+.slider-label span { font-family: var(--font-mono); font-weight: 700; color: var(--accent); font-size: 16px; }
+#mitigation-slider {
+  width: 100%; max-width: 500px;
+  accent-color: var(--ink); height: 4px; cursor: pointer;
+}
+.mit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px; }
+.mit-card { border-radius: var(--radius); border: 1px solid var(--line); padding: 26px; }
+.mit-before { background: rgba(193,53,42,0.04); border-color: rgba(193,53,42,0.2); }
+.mit-after { background: rgba(56,97,74,0.04); border-color: rgba(56,97,74,0.2); }
+.mit-card-title { font-family: var(--font-body); font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 16px; }
+.mit-before .mit-card-title { color: var(--accent); }
+.mit-after .mit-card-title { color: var(--good); }
+.mit-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+.mit-row:last-child { border-bottom: none; }
+.mit-key { font-size: 13px; color: var(--ink-soft); }
+.mit-val { font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+.mit-note { font-size: 13px; color: var(--ink-mute); font-style: italic; line-height: 1.5; }
+
+/* ══════ EVIDENCE WALL ═══════════════════════════════════════════ */
+#evidence-section { padding-bottom: 64px; }
+.evidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.evidence-card {
+  background: var(--bg-card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 26px; display: flex; flex-direction: column; gap: 12px;
+}
+.ev-domain { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute); }
+.ev-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; line-height: 1.25; }
+.ev-quote { font-size: 14px; color: var(--ink-soft); line-height: 1.6; font-style: italic; border-left: 2px solid var(--hl); padding-left: 12px; }
+.ev-source { font-family: var(--font-mono); font-size: 11px; color: var(--ink-mute); margin-top: auto; }
+
+/* ══════ UPLOAD ZONE ═════════════════════════════════════════════ */
+#upload-section { padding-bottom: 40px; }
+
+/* ══════ RESULTS (hidden until audit runs) ═══════════════════════ */
+#results-container { display: none; }
+#results-container.visible { display: block; animation: fadeUp 0.5s both; }
+.upload-zone {
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s;
+  background: var(--bg-card);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.upload-zone-icon { font-size: 40px; margin-bottom: 12px; }
+.upload-zone-text { font-size: 15px; color: var(--ink-soft); margin-bottom: 8px; }
+.upload-zone-hint { font-size: 12px; color: var(--ink-mute); }
+.upload-zone input[type=file] { display: none; }
+.upload-form { display: none; margin-top: 24px; }
+.upload-form.visible { display: block; }
+.upload-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-mute); margin-bottom: 6px;
+}
+.form-group select {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg-card); color: var(--ink);
+  font-family: var(--font-body); font-size: 14px; outline: none;
+  cursor: pointer; transition: border-color 0.2s;
+}
+.form-group select:focus { border-color: var(--ink-soft); }
+.upload-file-info {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; background: var(--good-soft);
+  border-radius: 8px; margin-bottom: 16px;
+  font-size: 13px; color: var(--good);
+}
+.upload-file-info .file-name { font-weight: 700; }
+.btn-audit {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--ink); color: #fff;
+  border: none; border-radius: 10px;
+  padding: 12px 28px; font-family: var(--font-body); font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: opacity 0.2s, transform 0.15s;
+}
+.btn-audit:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-audit:disabled { opacity: 0.5; cursor: wait; }
+.loading-spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.or-divider {
+  text-align: center; color: var(--ink-mute); font-size: 13px;
+  margin: 24px 0; position: relative;
+}
+.or-divider::before, .or-divider::after {
+  content: ''; position: absolute; top: 50%; width: 40%;
+  height: 1px; background: var(--line);
+}
+.or-divider::before { left: 0; }
+.or-divider::after { right: 0; }
+.server-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 10px; border-radius: 20px;
+  background: rgba(56,97,74,0.1); color: var(--good);
+  border: 1px solid rgba(56,97,74,0.2);
+}
+.server-badge.offline { background: rgba(193,53,42,0.1); color: var(--accent); border-color: rgba(193,53,42,0.2); }
+@media (max-width: 640px) {
+  .upload-form-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════ FOOTER ══════════════════════════════════════════════════ */
+#footer { border-top: 1px solid var(--line); padding: 28px 0; }
+.footer-text { font-size: 13px; color: var(--ink-mute); text-align: center; }
+
+/* ══════ ANIMATIONS ══════════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeUp 0.5s both; }
+.fade-in-1 { animation: fadeUp 0.5s 0.1s both; }
+.fade-in-2 { animation: fadeUp 0.5s 0.2s both; }
+.fade-in-3 { animation: fadeUp 0.5s 0.3s both; }
+.fade-in-4 { animation: fadeUp 0.5s 0.4s both; }
+
+/* ══════ RESPONSIVE ══════════════════════════════════════════════ */
+@media (max-width: 980px) {
+  .audit-grid { grid-template-columns: 1fr; }
+  .metric-cards { grid-template-columns: 1fr 1fr; }
+  .hero-stats { grid-template-columns: 1fr; gap: 16px; }
+}
+@media (max-width: 640px) {
+  .container { padding: 0 16px; }
+  .evidence-grid { grid-template-columns: 1fr; }
+  .mit-grid { grid-template-columns: 1fr; }
+  .metric-cards { grid-template-columns: 1fr; }
+  .gemini-panel { padding: 28px 20px; }
+  .verdict-banner { flex-direction: column; text-align: center; }
+  .header-key { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════ HEADER ══════════════════════════════════════════════ -->
+<header id="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <svg class="logo-svg" width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <line x1="13" y1="29" x2="19" y2="29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="16" y1="29" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="4" y1="10" x2="28" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="4" y1="10" x2="4" y2="18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="28" y1="10" x2="28" y2="21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M1 18 Q4.5 16.5 8 18" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <path d="M25 21 Q28.5 19.5 32 21" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <circle cx="16" cy="6" r="2" fill="currentColor"/>
+      </svg>
+      <span class="brand-name">FairLens</span>
+    </div>
+    <div class="header-key">
+      <span class="key-label" style="font-size:12px;letter-spacing:0.08em;color:var(--good)">Powered by Gemini 2.5 Flash</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════ HERO ══════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="container">
+    <h1 class="hero-title fade-in">Audit the algorithms<br><em>that decide lives.</em></h1>
+    <p class="hero-sub fade-in-1">FairLens audits the most consequential AI systems in the world — hiring, lending, and healthcare — to surface unfair patterns, explain them in plain English with Gemini, and simulate fixes before real people are harmed.</p>
+    <div class="hero-stats">
+      <div class="stat-item fade-in-2">
+        <span class="stat-number">200M+</span>
+        <span class="stat-label">patients affected by the Optum algorithm bias (Obermeyer et al., Science 2019)</span>
+      </div>
+      <div class="stat-item fade-in-3">
+        <span class="stat-number">80%</span>
+        <span class="stat-label">more likely — Black applicants rejected in lending (The Markup, 2021)</span>
+      </div>
+      <div class="stat-item fade-in-4">
+        <span class="stat-number">$5T</span>
+        <span class="stat-label">in lending allocated annually by biased models (US mortgage + consumer market)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ TABS ═══════════════════════════════════════════════════ -->
+<section id="tabs-section">
+  <div class="container">
+    <h2 class="section-title" style="margin-bottom:12px">Try a Demo Audit</h2>
+    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:16px">Select a domain to run a bias audit on a built-in dataset:</p>
+    <div class="tab-strip" role="tablist" aria-label="Use case selection">
+      <button class="tab-btn" data-domain="hiring" role="tab" aria-selected="false">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="6" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 6V4.5A2.5 2.5 0 0 1 10.5 4.5V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Hiring
+      </button>
+      <button class="tab-btn" data-domain="lending" role="tab" aria-selected="false">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v1.5M8 9.5V11M6.5 7.5C6.5 6.7 7.2 6 8 6s1.5.7 1.5 1.5S8.8 9 8 9s-1.5.7-1.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Lending
+      </button>
+      <button class="tab-btn" data-domain="healthcare" role="tab" aria-selected="false">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 13.5S2 9.8 2 5.8A3.3 3.3 0 0 1 8 3.9a3.3 3.3 0 0 1 6 1.9c0 4-6 7.7-6 7.7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 6.5h3M8 5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Healthcare
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ UPLOAD ZONE ═════════════════════════════════════════ -->
+<section id="upload-section">
+  <div class="container">
+    <div class="or-divider">OR UPLOAD YOUR OWN DATASET</div>
+    <div id="upload-zone" class="upload-zone" tabindex="0" role="button" aria-label="Upload CSV file">
+      <div class="upload-zone-icon">📂</div>
+      <div class="upload-zone-text">Drag & drop a CSV file here, or <strong>click to browse</strong></div>
+      <div class="upload-zone-hint">Max 10 MB · CSV format · Must include a decision column and a sensitive attribute column</div>
+      <input type="file" id="csv-file-input" accept=".csv">
+    </div>
+    <div id="upload-form" class="upload-form">
+      <div id="upload-file-info" class="upload-file-info"></div>
+      <div class="upload-form-grid">
+        <div class="form-group">
+          <label for="sel-sensitive">Sensitive Attribute</label>
+          <select id="sel-sensitive"><option value="">— select column —</option></select>
+        </div>
+        <div class="form-group">
+          <label for="sel-privileged">Privileged Value</label>
+          <select id="sel-privileged"><option value="">— select value —</option></select>
+        </div>
+        <div class="form-group">
+          <label for="sel-decision">Decision Column</label>
+          <select id="sel-decision"><option value="">— select column —</option></select>
+        </div>
+      </div>
+      <div class="upload-form-grid" style="margin-bottom:24px">
+        <div class="form-group">
+          <label for="sel-qualified">Ground Truth (optional)</label>
+          <select id="sel-qualified"><option value="">— none —</option></select>
+        </div>
+        <div class="form-group">
+          <label for="sel-score">Score Column (optional)</label>
+          <select id="sel-score"><option value="">— none —</option></select>
+        </div>
+      </div>
+      <button id="btn-run-audit" class="btn-audit" disabled>🔍 Run Bias Audit</button>
+    </div>
+  </div>
+</section>
+
+<div id="results-container">
+<!-- ══════ VERDICT BANNER ═════════════════════════════════════════ -->
+<section id="verdict-section">
+  <div class="container">
+    <div id="verdict-banner" class="verdict-banner verdict-bias">
+      <div id="verdict-icon" class="verdict-icon">⚠️</div>
+      <div class="verdict-main">
+        <div id="verdict-di" class="verdict-di">—</div>
+        <div class="verdict-sublabel">Disparate Impact (4/5ths rule: ≥ 0.80)</div>
+      </div>
+      <div id="verdict-label" class="verdict-label">Significant bias detected</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ AUDIT PANEL ════════════════════════════════════════════ -->
+<section id="audit-section">
+  <div class="container">
+    <div class="audit-grid">
+      <div class="card audit-chart-card">
+        <h2 class="section-title">Selection Rate by Group</h2>
+        <div id="chart-bars" class="chart-bars"></div>
+        <div class="callout-box">
+          Unlike simpler audits, FairLens uses <strong>ground-truth qualification labels</strong> to measure who is being incorrectly denied — not just who is denied. This is the IBM AIF360 / Microsoft Fairlearn standard.
+        </div>
+      </div>
+      <div id="metric-cards" class="metric-cards"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ DATA PREVIEW ═══════════════════════════════════════════ -->
+<section id="preview-section">
+  <div class="container">
+    <div class="preview-header">
+      <h2 class="section-title" style="margin-bottom:0">Data Preview</h2>
+      <span class="badge">12 of 240 rows</span>
+    </div>
+    <div class="table-wrap">
+      <table id="preview-table">
+        <thead id="preview-head"></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ GEMINI PANEL ═══════════════════════════════════════════ -->
+<section id="gemini-section">
+  <div class="container">
+    <div class="gemini-panel">
+      <div class="gemini-header">
+        <h2 class="gemini-title">AI Diagnosis</h2>
+        <p class="gemini-subtitle">Structured audit briefing powered by Gemini 2.5 Flash</p>
+        <div id="gemini-mode-label" class="gemini-mode">● Demo Mode — add API key for live Gemini analysis</div>
+        <button id="gemini-btn" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 8.5L7.5 10.5L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Generate AI Analysis
+        </button>
+      </div>
+      <div id="gemini-output" class="gemini-output"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ MITIGATION SIMULATOR ═══════════════════════════════════ -->
+<section id="mitigation-section">
+  <div class="container">
+    <h2 class="section-title">Mitigation Simulator</h2>
+    <p class="mit-intro">Post-processing reject-option: flip the top-scoring denied disadvantaged-group candidates. Watch all four fairness metrics update live alongside overall accuracy — see the trade-off honestly.</p>
+    <div class="slider-wrap">
+      <label class="slider-label" for="mitigation-slider">
+        Threshold adjustment for disadvantaged group: <span id="slider-value">0%</span>
+      </label>
+      <input type="range" id="mitigation-slider" min="0" max="100" value="0" step="1" aria-label="Mitigation percentage">
+    </div>
+    <div class="mit-grid">
+      <div id="mit-before" class="mit-card mit-before">
+        <div class="mit-card-title">Before mitigation</div>
+      </div>
+      <div id="mit-after" class="mit-card mit-after">
+        <div class="mit-card-title">After mitigation</div>
+      </div>
+    </div>
+    <p class="mit-note">Fairness often improves accuracy when the baseline model was incorrectly denying qualified candidates.</p>
+  </div>
+</section>
+
+<!-- ══════ EVIDENCE WALL ══════════════════════════════════════════ -->
+<section id="evidence-section">
+  <div class="container">
+    <h2 class="section-title">Real-World Evidence</h2>
+    <div class="evidence-grid">
+      <div class="evidence-card fade-in-1">
+        <div class="ev-domain">📌 Hiring</div>
+        <div class="ev-title">Amazon (2018)</div>
+        <div class="ev-quote">"Automated résumé screener penalised CVs containing the word 'women's', systematically downgrading graduates of all-women's colleges."</div>
+        <div class="ev-source">Source: Reuters, October 2018</div>
+      </div>
+      <div class="evidence-card fade-in-2">
+        <div class="ev-domain">📌 Lending</div>
+        <div class="ev-title">The Markup (2021)</div>
+        <div class="ev-quote">"Lenders were 80% more likely to reject Black applicants than White applicants with identical financial profiles, across 30 major US metro areas."</div>
+        <div class="ev-source">Source: The Markup, August 2021</div>
+      </div>
+      <div class="evidence-card fade-in-3">
+        <div class="ev-domain">📌 Healthcare</div>
+        <div class="ev-title">Obermeyer et al. (Science, 2019)</div>
+        <div class="ev-quote">"A widely-deployed care-management algorithm under-referred Black patients by ~50% because it used healthcare spend as a proxy for healthcare need."</div>
+        <div class="ev-source">Source: Science 366:6464, Oct 2019</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /results-container -->
+
+<!-- ══════ FOOTER ══════════════════════════════════════════════════ -->
+<footer id="footer">
+  <div class="container">
+    <p class="footer-text">FairLens — AI Fairness Auditor · Powered by Gemini 2.5 Flash · MIT License</p>
+  </div>
+</footer>
+
+<script>
+/* ══════ STATE ══════════════════════════════════════════════════ */
+const state = {
+  domain: 'hiring',
+  adjPct: 0,
+  datasets: {},
+  serverOnline: false,
+  // Backend data
+  currentMetrics: null,
+  currentMitSweep: null,
+  currentDataSummary: null,
+  currentAuditId: null,
+  // Upload state
+  uploadedFile: null,
+  uploadHeaders: [],
+  uploadFilePath: null,
+  uploadFileId: null,
+};
+
+/* ══════ DOMAIN CONFIG ══════════════════════════════════════════ */
+const DOMAIN_CONFIG = {
+  hiring: {
+    seed: 42, n: 240,
+    attr: 'Gender', priv: 'Male', unpriv: 'Female',
+    columns: ['id','gender','exp_yrs','resume_score','qualified','hired'],
+    headers: ['ID','Gender','Exp Yrs','Resume Score','Qualified','Hired'],
+    decisionKey: 'hired',
+    scoreKey: 'resume_score',
+    privLabel: 'Male', unprivLabel: 'Female',
+    name: 'Hiring',
+    biasNote: 'Female candidates require resume score ≥ 87 vs ≥ 70 for males.',
+  },
+  lending: {
+    seed: 137, n: 240,
+    attr: 'Group', priv: 'Group A', unpriv: 'Group B',
+    columns: ['id','group','credit_score','income_k','debt_ratio','qualified','approved'],
+    headers: ['ID','Group','Credit Score','Income (k)','Debt Ratio','Qualified','Approved'],
+    decisionKey: 'approved',
+    scoreKey: 'credit_score',
+    privLabel: 'Group A', unprivLabel: 'Group B',
+    name: 'Lending',
+    biasNote: 'Group B requires credit score ≥ 724 vs ≥ 680 for Group A.',
+  },
+  healthcare: {
+    seed: 89, n: 240,
+    attr: 'Group', priv: 'Reference', unpriv: 'Underserved',
+    columns: ['id','group','severity','prior_spend','qualified','referred'],
+    headers: ['ID','Group','Severity','Prior Spend ($)','Qualified','Referred'],
+    decisionKey: 'referred',
+    scoreKey: 'severity',
+    privLabel: 'Reference', unprivLabel: 'Underserved',
+    name: 'Healthcare',
+    biasNote: 'Model uses spend as proxy for need; Underserved patients spend less due to access barriers.',
+  },
+};
+
+/* ══════ PRNG (mulberry32) ══════════════════════════════════════ */
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ══════ DATASET GENERATION ════════════════════════════════════ */
+function generateDataset(domain) {
+  if (state.datasets[domain]) return state.datasets[domain];
+  const rand = mulberry32(DOMAIN_CONFIG[domain].seed);
+  const rows = [];
+
+  for (let i = 0; i < 240; i++) {
+    if (domain === 'hiring') {
+      const privileged = i % 2 === 0;
+      const exp = Math.floor(rand() * 12) + 1;
+      const score = Math.floor(rand() * 51) + 50;
+      const qualified = score >= 70 && exp >= 3;
+      const decision = privileged ? score >= 70 : score >= 87;
+      rows.push({
+        id: i + 1, privileged,
+        gender: privileged ? 'Male' : 'Female',
+        exp_yrs: exp, resume_score: score,
+        qualified, hired: decision, decision,
+        score,
+        display: [i+1, privileged ? 'Male' : 'Female', exp, score, qualified, decision],
+      });
+
+    } else if (domain === 'lending') {
+      const privileged = i % 2 === 0;
+      const credit = Math.floor(rand() * 241) + 580;
+      const income = Math.floor(rand() * 91) + 28;
+      const debt = parseFloat((rand() * 0.55).toFixed(2));
+      const qualified = credit >= 680 && debt < 0.40;
+      const decision = privileged ? credit >= 680 : credit >= 724;
+      rows.push({
+        id: i + 1, privileged,
+        group: privileged ? 'Group A' : 'Group B',
+        credit_score: credit, income_k: income, debt_ratio: debt,
+        qualified, approved: decision, decision,
+        score: credit,
+        display: [i+1, privileged ? 'Group A' : 'Group B', credit, income, debt.toFixed(2), qualified, decision],
+      });
+
+    } else {
+      const privileged = i % 2 === 0;
+      const severity = Math.floor(rand() * 101);
+      const spend = privileged
+        ? Math.floor(rand() * 8000) + 3000
+        : Math.floor(rand() * 5000) + 1000;
+      const qualified = severity >= 60;
+      const decision = spend >= 4000;
+      rows.push({
+        id: i + 1, privileged,
+        group: privileged ? 'Reference' : 'Underserved',
+        severity, prior_spend: spend,
+        qualified, referred: decision, decision,
+        score: severity,
+        display: [i+1, privileged ? 'Reference' : 'Underserved', severity, spend, qualified, decision],
+      });
+    }
+  }
+
+  state.datasets[domain] = rows;
+  return rows;
+}
+
+/* ══════ MITIGATION ════════════════════════════════════════════ */
+function applyMitigation(rows, adjPct) {
+  if (adjPct === 0) return rows;
+  const copy = rows.map(r => Object.assign({}, r));
+  const denied = copy.filter(r => !r.privileged && !r.decision)
+                     .sort((a, b) => b.score - a.score);
+  const flipCount = Math.floor(denied.length * adjPct / 100);
+  const toFlip = new Set(denied.slice(0, flipCount).map(r => r.id));
+  copy.forEach(r => { if (toFlip.has(r.id)) r.decision = true; });
+  return copy;
+}
+
+/* ══════ METRICS ═══════════════════════════════════════════════ */
+function computeMetrics(rows) {
+  const priv = rows.filter(r => r.privileged);
+  const unpriv = rows.filter(r => !r.privileged);
+
+  const selP = priv.filter(r => r.decision).length / priv.length;
+  const selU = unpriv.filter(r => r.decision).length / unpriv.length;
+  const DI   = selU / selP;
+  const SPD  = selU - selP;
+
+  const privQual    = priv.filter(r => r.qualified);
+  const unprivQual  = unpriv.filter(r => r.qualified);
+  const privNQual   = priv.filter(r => !r.qualified);
+  const unprivNQual = unpriv.filter(r => !r.qualified);
+
+  const tprP = privQual.length   ? privQual.filter(r => r.decision).length   / privQual.length   : 0;
+  const tprU = unprivQual.length ? unprivQual.filter(r => r.decision).length / unprivQual.length : 0;
+  const fprP = privNQual.length  ? privNQual.filter(r => r.decision).length  / privNQual.length  : 0;
+  const fprU = unprivNQual.length? unprivNQual.filter(r => r.decision).length/ unprivNQual.length: 0;
+
+  const EOD  = tprU - tprP;
+  const AAOD = (Math.abs(tprU - tprP) + Math.abs(fprU - fprP)) / 2;
+  const acc  = rows.filter(r => r.decision === r.qualified).length / rows.length;
+
+  return { DI, SPD, EOD, AAOD, selP, selU, tprP, tprU, fprP, fprU, acc,
+           nPriv: priv.length, nUnpriv: unpriv.length, n: rows.length };
+}
+
+/* ══════ VERDICT HELPERS ═══════════════════════════════════════ */
+function diLevel(di) {
+  if (di >= 0.80 && di <= 1.25) return 'fair';
+  if ((di >= 0.65 && di < 0.80) || (di > 1.25 && di <= 1.39)) return 'borderline';
+  return 'bias';
+}
+
+function diffLevel(val) {
+  const a = Math.abs(val);
+  if (a <= 0.05) return 'fair';
+  if (a <= 0.10) return 'borderline';
+  return 'bias';
+}
+
+function worstLevel(metrics) {
+  const order = { fair: 0, borderline: 1, bias: 2 };
+  const levels = [diLevel(metrics.DI), diffLevel(metrics.SPD), diffLevel(metrics.EOD), diffLevel(metrics.AAOD)];
+  return levels.reduce((w, l) => order[l] > order[w] ? l : w, 'fair');
+}
+
+function pct(val) { return (val * 100).toFixed(1) + '%'; }
+function fmt(val) { return val.toFixed(3); }
+
+/* ══════ RENDER VERDICT ════════════════════════════════════════ */
+function renderVerdict(metrics) {
+  const level = worstLevel(metrics);
+  const banner = document.getElementById('verdict-banner');
+  banner.className = 'verdict-banner verdict-' + level;
+
+  const icons = { bias: '⚠️', borderline: '🔍', fair: '✅' };
+  const labels = { bias: 'Significant bias detected', borderline: 'Borderline — investigate', fair: 'No bias found' };
+
+  document.getElementById('verdict-icon').textContent = icons[level];
+  document.getElementById('verdict-di').textContent = fmt(metrics.DI);
+  document.getElementById('verdict-label').textContent = labels[level];
+  document.getElementById('verdict-label').className = 'verdict-label';
+}
+
+/* ══════ RENDER CHART ══════════════════════════════════════════ */
+function renderChart(metrics, cfg) {
+  const container = document.getElementById('chart-bars');
+  container.innerHTML = '';
+
+  const groups = [
+    { name: cfg.privLabel,   rate: metrics.selP, n: metrics.nPriv,   cls: 'bar-fill-priv' },
+    { name: cfg.unprivLabel, rate: metrics.selU, n: metrics.nUnpriv, cls: 'bar-fill-unpriv' },
+  ];
+
+  groups.forEach(g => {
+    const pctVal = (g.rate * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `
+      <div class="bar-meta">
+        <span class="bar-group-name">${g.name}</span>
+        <span class="bar-n">n=${g.n}</span>
+        <span class="bar-pct">${pctVal}%</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill ${g.cls}" style="--w:0%" data-target="${pctVal}%"></div>
+      </div>`;
+    container.appendChild(row);
+  });
+
+  requestAnimationFrame(() => {
+    container.querySelectorAll('.bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.target;
+    });
+  });
+}
+
+/* ══════ RENDER METRIC CARDS ═══════════════════════════════════ */
+const METRIC_META = {
+  DI:   { name: 'Disparate Impact',                tip: 'Ratio of selection rates: P(ŷ=1|unprivileged) ÷ P(ŷ=1|privileged). EEOC 4/5ths rule: must be ≥ 0.80. Values below 0.65 indicate significant bias.', explain: level => level==='bias' ? 'Selection rate for disadvantaged group is far below the EEOC 4/5ths rule.' : level==='borderline' ? 'Selection rate difference is borderline — review threshold settings.' : 'Selection rates are roughly equal across groups.' },
+  SPD:  { name: 'Stat. Parity Difference',         tip: 'Absolute difference in selection rates: P(ŷ=1|unpriv) − P(ŷ=1|priv). Fair if |SPD| ≤ 0.05.', explain: level => level==='bias' ? 'Substantial gap in selection rates between groups.' : level==='borderline' ? 'Moderate selection rate gap — monitor closely.' : 'Selection rates are nearly equal.' },
+  EOD:  { name: 'Equal Opportunity Diff.',          tip: 'TPR difference: P(ŷ=1|Y=1, unpriv) − P(ŷ=1|Y=1, priv). Measures how often qualified people in each group are correctly approved. Fair if |EOD| ≤ 0.05.', explain: level => level==='bias' ? 'Qualified people in the disadvantaged group are being incorrectly denied at a much higher rate.' : level==='borderline' ? 'Qualified people in the disadvantaged group face a moderately higher denial rate.' : 'Qualified candidates are approved at similar rates across groups.' },
+  AAOD: { name: 'Avg Absolute Odds Diff.',          tip: 'Average of |TPR difference| and |FPR difference|. Combines both error rates. Fair if ≤ 0.05.', explain: level => level==='bias' ? 'The model has very different error rates for the two groups.' : level==='borderline' ? 'Moderate difference in error rates between groups.' : 'Model error rates are comparable across groups.' },
+};
+
+function renderMetricCards(metrics) {
+  const container = document.getElementById('metric-cards');
+  container.innerHTML = '';
+
+  const entries = [
+    { key: 'DI',   value: metrics.DI,   level: diLevel(metrics.DI) },
+    { key: 'SPD',  value: metrics.SPD,  level: diffLevel(metrics.SPD) },
+    { key: 'EOD',  value: metrics.EOD,  level: diffLevel(metrics.EOD) },
+    { key: 'AAOD', value: metrics.AAOD, level: diffLevel(metrics.AAOD) },
+  ];
+
+  const badgeLabels = { bias: '● Bias', borderline: '● Borderline', fair: '● Fair' };
+
+  entries.forEach((entry, idx) => {
+    const meta = METRIC_META[entry.key];
+    const card = document.createElement('div');
+    card.className = `metric-card status-${entry.level}`;
+    card.style.animationDelay = (idx * 0.08) + 's';
+    card.innerHTML = `
+      <div class="metric-name-row">
+        <span class="metric-name">${meta.name}</span>
+        <span class="metric-tooltip" data-tip="${meta.tip}">ⓘ</span>
+      </div>
+      <div class="metric-val">${fmt(entry.value)}</div>
+      <div class="status-badge"><span class="badge-dot"></span>${badgeLabels[entry.level]}</div>
+      <div class="metric-explain">${meta.explain(entry.level)}</div>`;
+    container.appendChild(card);
+  });
+}
+
+/* ══════ RENDER DATA PREVIEW ════════════════════════════════════ */
+function renderPreview(rows, cfg) {
+  const head = document.getElementById('preview-head');
+  const body = document.getElementById('preview-body');
+  head.innerHTML = '<tr>' + cfg.headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+  body.innerHTML = '';
+
+  rows.slice(0, 12).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = row.display.map((cell, i) => {
+      if (typeof cell === 'boolean') {
+        return `<td class="${cell ? 'cell-yes' : 'cell-no'}">${cell ? 'Yes' : 'No'}</td>`;
+      }
+      if (i === 1) {
+        const isPriv = cell === cfg.privLabel;
+        return `<td class="${isPriv ? 'cell-priv' : 'cell-unpriv'}">${cell}</td>`;
+      }
+      return `<td class="mono">${cell}</td>`;
+    }).join('');
+    body.appendChild(tr);
+  });
+}
+
+/* ══════ RENDER MITIGATION ══════════════════════════════════════ */
+function renderMitigation(beforeMetrics, afterMetrics, cfg) {
+  function mitRows(m, isAfter) {
+    const rows = [
+      { key: 'Disparate Impact',       val: fmt(m.DI),   color: isAfter && m.DI > beforeMetrics.DI },
+      { key: 'Statistical Parity Δ',   val: fmt(m.SPD),  color: isAfter && Math.abs(m.SPD) < Math.abs(beforeMetrics.SPD) },
+      { key: 'Equal Opportunity Δ',    val: fmt(m.EOD),  color: isAfter && Math.abs(m.EOD) < Math.abs(beforeMetrics.EOD) },
+      { key: `${cfg.unprivLabel} sel. rate`, val: pct(m.selU), color: false },
+      { key: `${cfg.privLabel} sel. rate`,   val: pct(m.selP), color: false },
+      { key: 'Overall Accuracy',        val: pct(m.acc),  color: false },
+    ];
+    return rows.map(r => `
+      <div class="mit-row">
+        <span class="mit-key">${r.key}</span>
+        <span class="mit-val" ${r.color ? 'style="color:var(--good)"' : ''}>${r.val}</span>
+      </div>`).join('');
+  }
+
+  document.getElementById('mit-before').innerHTML =
+    '<div class="mit-card-title">Before mitigation</div>' + mitRows(beforeMetrics, false);
+  document.getElementById('mit-after').innerHTML =
+    '<div class="mit-card-title">After mitigation</div>' + mitRows(afterMetrics, true);
+}
+
+/* ══════ OFFLINE ANALYSIS ══════════════════════════════════════ */
+const OFFLINE_ANALYSIS = {
+  hiring: `## Diagnosis
+The hiring algorithm exhibits severe disparate impact against female candidates. The selection rate for women is substantially lower than for men, well below the EEOC 4/5ths rule threshold of 0.80. The Equal Opportunity Difference confirms that qualified women are being incorrectly denied at a significantly higher rate — this is not simply a pipeline problem.
+
+## Who is harmed
+Female applicants are the harmed group, experiencing **allocative harm** — systematically denied employment opportunities they are qualified for. This compounds over time as wage gaps, career advancement barriers, and reduced retirement savings accumulate.
+
+## Likely root cause
+- Resume score threshold calibrated on historically male-dominated hires, encoding prior discrimination as a baseline
+- No fairness constraint applied during threshold selection — only aggregate accuracy was optimized
+- Proxy features (e.g. gap years, part-time history) correlated with gender and treated as negative signals
+
+## Mitigation playbook
+1. **Pre-processing:** Re-weight training data to equalise group representation; remove or transform proxy features correlated with gender.
+2. **In-processing:** Apply an adversarial debiasing constraint during model training that penalises disparate impact on gender groups.
+3. **Post-processing:** Apply reject-option classification — promote the most-qualified denied female candidates until the EEOC 4/5ths threshold is satisfied.
+4. **Governance:** Mandate quarterly disparate impact audits with a defined remediation SLA; require sign-off from a designated fairness officer before threshold changes go live.`,
+
+  lending: `## Diagnosis
+The lending model places Group B applicants at a significant disadvantage, requiring a substantially higher credit score threshold for approval. While borderline by EEOC standards, the Equal Opportunity Difference reveals that qualified Group B borrowers are being denied at a meaningfully higher rate — indicating the model is making more errors on this population, not simply reflecting genuine risk differences.
+
+## Who is harmed
+Group B borrowers experience **allocative harm** — denial of credit they would repay, blocking wealth-building through homeownership and business formation. Secondary representational harm emerges as Group B communities receive less capital investment overall.
+
+## Likely root cause
+- Credit score models trained on historical lending data that itself reflects discriminatory lending practices (redlining, disparate access)
+- Income and zip-code features act as proxies for race, encoding structural inequality as individual risk
+- Calibration performed on Group A data; model is miscalibrated for Group B applicants
+
+## Mitigation playbook
+1. **Pre-processing:** Rebalance training data using re-weighting; remove zip-code and neighbourhood-level features that proxy for race.
+2. **In-processing:** Add a fairness regularisation term (e.g. equalized odds constraint) during model training.
+3. **Post-processing:** Apply group-specific classification thresholds calibrated so each group achieves equal false-positive and false-negative rates.
+4. **Governance:** Implement a real-time disparate impact dashboard reviewed monthly by compliance; trigger mandatory human review for all borderline Group B denials.`,
+
+  healthcare: `## Diagnosis
+The care-management algorithm severely under-refers Underserved patients, achieving a disparate impact ratio well below the safe threshold. The root issue — documented by Obermeyer et al. in Science (2019) — is using prior healthcare spend as a proxy for healthcare need. Underserved patients spend less not because they are healthier, but because systemic access barriers reduce their utilisation. The Equal Opportunity Difference confirms qualified (high-severity) patients in the Underserved group are being denied referral at a far higher rate.
+
+## Who is harmed
+Underserved patients face **quality-of-service harm** — unequal access to specialist care and disease management programs based on their identity, not their medical need. This exacerbates existing health disparities and can result in preventable morbidity and mortality.
+
+## Likely root cause
+- Prior healthcare spend used as the primary proxy for disease burden, conflating access with need
+- Model trained and validated on data from a period when access disparities already existed, encoding those disparities as ground truth
+- No protected-attribute fairness audit performed before deployment at scale
+
+## Mitigation playbook
+1. **Pre-processing:** Replace spend-based proxies with direct clinical severity measures (lab values, diagnosis codes, validated severity scores).
+2. **In-processing:** Train a fairness-aware model with an equalized opportunity constraint across demographic groups.
+3. **Post-processing:** Apply a recalibrated decision threshold for Underserved patients based on clinical severity rather than predicted cost.
+4. **Governance:** Partner with community health organisations to audit outcomes quarterly; require independent IRB review before deploying algorithm changes affecting access to care.`,
+};
+
+/* ══════ GEMINI INTEGRATION ═════════════════════════════════════ */
+async function fetchGeminiAnalysis(domain, metrics, apiKey) {
+  const cfg = DOMAIN_CONFIG[domain];
+  const prompt = `You are FairLens, a senior AI fairness auditor.
+
+Domain: ${cfg.name}
+Records audited: ${metrics.n}
+Sensitive attribute: ${cfg.attr}
+Privileged group: ${cfg.privLabel} (n=${metrics.nPriv}) — Selection rate: ${pct(metrics.selP)}
+Disadvantaged group: ${cfg.unprivLabel} (n=${metrics.nUnpriv}) — Selection rate: ${pct(metrics.selU)}
+
+Fairness metrics:
+- Disparate Impact: ${fmt(metrics.DI)}  (EEOC threshold ≥ 0.80)
+- Statistical Parity Difference: ${fmt(metrics.SPD)}
+- Equal Opportunity Difference: ${fmt(metrics.EOD)}
+- True Positive Rate — ${cfg.privLabel}: ${pct(metrics.tprP)}
+- True Positive Rate — ${cfg.unprivLabel}: ${pct(metrics.tprU)}
+- Overall accuracy: ${pct(metrics.acc)}
+
+Write a structured audit briefing with EXACTLY these four sections. Use markdown headings (##). Max 280 words total.
+
+## Diagnosis
+2–3 sentences on what the numbers show.
+
+## Who is harmed
+1–2 sentences naming the group and the type of harm (allocative, representational, or quality-of-service).
+
+## Likely root cause
+3 bullet points with domain-specific causes.
+
+## Mitigation playbook
+4 numbered steps: one pre-processing, one in-processing, one post-processing, one governance/audit action.`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    }
+  );
+
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+/* ══════ MARKDOWN RENDERER ══════════════════════════════════════ */
+function renderMarkdown(text) {
+  const sections = text.split(/^## /m).filter(Boolean);
+  let html = '';
+  sections.forEach(section => {
+    const newline = section.indexOf('\n');
+    const heading = newline > -1 ? section.slice(0, newline).trim() : section.trim();
+    const body = newline > -1 ? section.slice(newline + 1).trim() : '';
+
+    let bodyHtml = body
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+      .replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+
+    if (bodyHtml.includes('<li>')) {
+      bodyHtml = bodyHtml.replace(/(<li>[\s\S]*?<\/li>\s*)+/g, m => `<ul>${m}</ul>`);
+    }
+    bodyHtml = bodyHtml.split('\n\n').map(p => p.trim() && !p.includes('<ul>') ? `<p>${p.replace(/\n/g, ' ')}</p>` : p).join('');
+
+    html += `<div class="gem-section"><h4 class="gem-h">${heading}</h4><div class="gem-body">${bodyHtml}</div></div>`;
+  });
+  return html;
+}
+
+
+
+
+/* ══════ BACKEND API HELPERS ════════════════════════════════════ */
+const API = '';  // same origin
+
+async function checkServer() {
+  try {
+    const r = await fetch(API + '/api/health');
+    if (r.ok) {
+      state.serverOnline = true;
+    }
+  } catch { state.serverOnline = false; }
+}
+
+async function fetchDemoFromServer(domain) {
+  const r = await fetch(API + '/api/demo/' + domain);
+  if (!r.ok) throw new Error('Server error');
+  return r.json();
+}
+
+/* ══════ RENDER FROM BACKEND METRICS ═══════════════════════════ */
+function mapServerMetrics(m) {
+  return {
+    DI: m.disparate_impact, SPD: m.statistical_parity_difference,
+    EOD: m.equal_opportunity_difference, AAOD: m.avg_absolute_odds_difference,
+    selP: m.selection_rate_privileged, selU: m.selection_rate_unprivileged,
+    tprP: m.tpr_privileged, tprU: m.tpr_unprivileged,
+    fprP: m.fpr_privileged, fprU: m.fpr_unprivileged,
+    acc: m.overall_accuracy,
+    nPriv: m.n_privileged, nUnpriv: m.n_unprivileged, n: m.n_total,
+  };
+}
+
+function renderFromServer(data, cfg) {
+  const m = mapServerMetrics(data.metrics);
+  state.currentMetrics = data.metrics;
+  state.currentMitSweep = data.mitigation_sweep;
+  state.currentDataSummary = data.data_summary;
+
+  // Show results container
+  document.getElementById('results-container').classList.add('visible');
+
+  renderVerdict(m);
+  renderChart(m, cfg);
+  renderMetricCards(m);
+
+  // Render preview from server data
+  if (data.data_summary) {
+    const ds = data.data_summary;
+    const head = document.getElementById('preview-head');
+    const body = document.getElementById('preview-body');
+    const badge = document.querySelector('#preview-section .badge');
+    if (badge) badge.textContent = `${Math.min(15, ds.row_count)} of ${ds.row_count} rows`;
+
+    head.innerHTML = '<tr>' + ds.preview_headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+    body.innerHTML = '';
+    ds.preview_rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = row.map((cell, i) => {
+        const s = String(cell);
+        if (s === 'true' || s === 'True') return '<td class="cell-yes">Yes</td>';
+        if (s === 'false' || s === 'False') return '<td class="cell-no">No</td>';
+        if (i === 1) {
+          const isPriv = s === cfg.privLabel;
+          return `<td class="${isPriv ? 'cell-priv' : 'cell-unpriv'}">${s}</td>`;
+        }
+        return `<td class="mono">${s}</td>`;
+      }).join('');
+      body.appendChild(tr);
+    });
+  }
+
+  // Mitigation from sweep
+  const baseM = m;
+  const mit0 = data.mitigation_sweep?.['0'];
+  const mitPct = state.adjPct;
+  const nearest = String(Math.round(mitPct / 10) * 10);
+  const mitData = data.mitigation_sweep?.[nearest] || data.metrics;
+  const afterM = mapServerMetrics(mitData);
+  renderMitigation(baseM, afterM, cfg);
+
+  // Reset gemini
+  document.getElementById('gemini-output').innerHTML = '';
+  document.getElementById('gemini-mode-label').textContent = '● Click to generate Gemini AI analysis';
+  document.getElementById('gemini-mode-label').style.color = '';
+}
+
+/* ══════ RENDER ALL (with server fallback) ═════════════════════ */
+async function renderAll() {
+  const domain = state.domain;
+  const cfg = DOMAIN_CONFIG[domain];
+  if (!cfg) return;
+
+  // Show results container
+  document.getElementById('results-container').classList.add('visible');
+
+  if (state.serverOnline) {
+    try {
+      const data = await fetchDemoFromServer(domain);
+      if (data.success) {
+        renderFromServer(data, cfg);
+        return;
+      }
+    } catch (e) { console.warn('Server fallback:', e); }
+  }
+
+  // Client-side fallback
+  const rows = generateDataset(domain);
+  const baseMetrics = computeMetrics(rows);
+  const mitigatedRows = applyMitigation(rows, state.adjPct);
+  const mitMetrics = computeMetrics(mitigatedRows);
+
+  renderVerdict(baseMetrics);
+  renderChart(baseMetrics, cfg);
+  renderMetricCards(baseMetrics);
+  renderPreview(rows, cfg);
+  renderMitigation(baseMetrics, mitMetrics, cfg);
+
+  document.getElementById('gemini-output').innerHTML = '';
+  document.getElementById('gemini-mode-label').textContent = '● Click to generate Gemini AI analysis';
+  document.getElementById('gemini-mode-label').style.color = '';
+}
+
+/* ══════ SLIDER (server-aware) ═════════════════════════════════ */
+let sliderRafPending = false;
+function onSliderInput(evt) {
+  state.adjPct = parseInt(evt.target.value, 10);
+  document.getElementById('slider-value').textContent = state.adjPct + '%';
+  if (!sliderRafPending) {
+    sliderRafPending = true;
+    requestAnimationFrame(() => {
+      const domain = state.domain;
+      const cfg = DOMAIN_CONFIG[domain];
+
+      if (state.currentMitSweep && cfg) {
+        const nearest = String(Math.round(state.adjPct / 10) * 10);
+        const mitData = state.currentMitSweep[nearest] || state.currentMetrics;
+        const baseM = mapServerMetrics(state.currentMetrics);
+        const afterM = mapServerMetrics(mitData);
+        renderMitigation(baseM, afterM, cfg);
+      } else if (cfg) {
+        const rows = generateDataset(domain);
+        const baseMetrics = computeMetrics(rows);
+        const mitigatedRows = applyMitigation(rows, state.adjPct);
+        const mitMetrics = computeMetrics(mitigatedRows);
+        renderMitigation(baseMetrics, mitMetrics, cfg);
+      }
+      sliderRafPending = false;
+    });
+  }
+}
+
+/* ══════ GEMINI (through backend proxy) ════════════════════════ */
+async function handleGeminiClick() {
+  const btn = document.getElementById('gemini-btn');
+  const output = document.getElementById('gemini-output');
+  const modeLabel = document.getElementById('gemini-mode-label');
+
+  if (!state.currentMetrics) {
+    alert('Run an audit first before generating AI analysis.');
+    return;
+  }
+
+  btn.disabled = true;
+  output.className = 'gemini-output loading';
+  output.innerHTML = '';
+
+  let text = '';
+  let isLive = false;
+
+  try {
+    const r = await fetch(API + '/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        domain: state.domain,
+        metrics: state.currentMetrics,
+        audit_id: state.currentAuditId,
+      }),
+    });
+    const data = await r.json();
+    if (data.success && data.analysis) {
+      text = data.analysis;
+      isLive = true;
+    } else {
+      // Fallback to built-in analysis when API is unavailable
+      if (OFFLINE_ANALYSIS[state.domain]) {
+        text = OFFLINE_ANALYSIS[state.domain];
+      } else {
+        text = '## Analysis\nGemini API is currently rate-limited. The bias metrics above tell the full story — this dataset shows significant disparate impact requiring investigation.';
+      }
+    }
+  } catch (e) {
+    if (OFFLINE_ANALYSIS[state.domain]) {
+      text = OFFLINE_ANALYSIS[state.domain];
+    } else {
+      text = '## Analysis\nCould not reach the analysis server. Review the metrics above for the bias assessment.';
+    }
+  }
+
+  output.className = 'gemini-output';
+  output.innerHTML = renderMarkdown(text);
+
+  modeLabel.textContent = isLive
+    ? '● Gemini 2.5 Flash — Live AI Analysis'
+    : '● Gemini 2.5 Flash — Cached Analysis';
+  modeLabel.style.color = isLive ? '#86d69e' : '#f0c93f';
+
+  btn.disabled = false;
+}
+
+/* ══════ UPLOAD HANDLING ═══════════════════════════════════════ */
+function setupUpload() {
+  const zone = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('csv-file-input');
+  const form = document.getElementById('upload-form');
+  const btnAudit = document.getElementById('btn-run-audit');
+
+  zone.addEventListener('click', () => fileInput.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter') fileInput.click(); });
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) handleFileSelected(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFileSelected(fileInput.files[0]);
+  });
+
+  // When sensitive attr column changes, populate privileged values
+  document.getElementById('sel-sensitive').addEventListener('change', async (e) => {
+    const col = e.target.value;
+    const selPriv = document.getElementById('sel-privileged');
+    selPriv.innerHTML = '<option value="">— select value —</option>';
+    if (!col || !state.uploadedFileContent) return;
+
+    // Parse unique values from the uploaded CSV content
+    const lines = state.uploadedFileContent.split('\n').filter(l => l.trim());
+    const headers = lines[0].split(',').map(h => h.trim());
+    const colIdx = headers.indexOf(col);
+    if (colIdx === -1) return;
+
+    const uniqueVals = new Set();
+    for (let i = 1; i < lines.length; i++) {
+      const val = lines[i].split(',')[colIdx]?.trim();
+      if (val) uniqueVals.add(val);
+    }
+    uniqueVals.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      selPriv.appendChild(opt);
+    });
+    checkAuditReady();
+  });
+
+  document.getElementById('sel-privileged').addEventListener('change', checkAuditReady);
+  document.getElementById('sel-decision').addEventListener('change', checkAuditReady);
+
+  btnAudit.addEventListener('click', runCustomAudit);
+}
+
+function checkAuditReady() {
+  const s = document.getElementById('sel-sensitive').value;
+  const p = document.getElementById('sel-privileged').value;
+  const d = document.getElementById('sel-decision').value;
+  document.getElementById('btn-run-audit').disabled = !(s && p && d);
+}
+
+async function handleFileSelected(file) {
+  if (!state.serverOnline) {
+    alert('Backend server is not running. Start it with: npm start');
+    return;
+  }
+
+  // Read file content for column parsing
+  state.uploadedFileContent = await file.text();
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const r = await fetch(API + '/api/upload', { method: 'POST', body: formData });
+    const data = await r.json();
+    if (!data.success) { alert('Upload error: ' + data.error); return; }
+
+    state.uploadHeaders = data.headers;
+    state.uploadFilePath = data.file_path;
+    state.uploadFileId = data.file_id;
+
+    // Show form
+    document.getElementById('upload-form').classList.add('visible');
+    document.getElementById('upload-file-info').innerHTML =
+      `✅ <span class="file-name">${data.filename}</span> — ${data.row_count} rows, ${data.headers.length} columns`;
+
+    // Populate dropdowns
+    const selectors = ['sel-sensitive', 'sel-decision', 'sel-qualified', 'sel-score'];
+    selectors.forEach(id => {
+      const sel = document.getElementById(id);
+      const firstOpt = sel.options[0].textContent;
+      sel.innerHTML = `<option value="">${firstOpt}</option>`;
+      data.headers.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h; opt.textContent = h;
+        sel.appendChild(opt);
+      });
+    });
+
+    // Deactivate demo tabs
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    state.domain = 'custom';
+
+  } catch (e) {
+    alert('Upload failed: ' + e.message);
+  }
+}
+
+async function runCustomAudit() {
+  const btn = document.getElementById('btn-run-audit');
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span> Analyzing…';
+
+  try {
+    const body = {
+      file_id: state.uploadFileId,
+      file_path: state.uploadFilePath,
+      filename: state.uploadedFile?.name,
+      sensitive_attr: document.getElementById('sel-sensitive').value,
+      privileged_value: document.getElementById('sel-privileged').value,
+      decision_column: document.getElementById('sel-decision').value,
+      qualified_column: document.getElementById('sel-qualified').value || undefined,
+      score_column: document.getElementById('sel-score').value || undefined,
+      domain: 'custom',
+    };
+
+    const r = await fetch(API + '/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!data.success) { alert('Audit error: ' + data.error); return; }
+
+    state.currentAuditId = data.audit_id;
+    const cfg = {
+      privLabel: body.privileged_value,
+      unprivLabel: 'Other',
+      name: 'Custom Dataset',
+    };
+    // Figure out the unprivileged label
+    if (data.data_summary?.groups) {
+      const groups = Object.keys(data.data_summary.groups);
+      cfg.unprivLabel = groups.find(g => g !== body.privileged_value) || 'Other';
+    }
+
+    renderFromServer(data, cfg);
+    document.getElementById('results-container').classList.add('visible');
+    document.querySelector('#verdict-section').scrollIntoView({ behavior: 'smooth' });
+
+  } catch (e) {
+    alert('Audit failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origText;
+  }
+}
+
+/* ══════ EVENT LISTENERS ════════════════════════════════════════ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    state.domain = btn.dataset.domain;
+    state.adjPct = 0;
+    document.getElementById('mitigation-slider').value = 0;
+    document.getElementById('slider-value').textContent = '0%';
+    renderAll();
+  });
+});
+
+document.getElementById('mitigation-slider').addEventListener('input', onSliderInput);
+document.getElementById('gemini-btn').addEventListener('click', handleGeminiClick);
+
+/* ══════ INIT ═══════════════════════════════════════════════════ */
+(async () => {
+  await checkServer();
+  setupUpload();
+  // Don't auto-render results — wait for user to pick a demo or upload
+})();
+</script>
+</body>
+</html>
+--- END OF FILE ---

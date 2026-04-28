@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+uploads/
+db/fairlens.db
+db/fairlens.db-wal
+db/fairlens.db-shm
+.env
+demo_data/
